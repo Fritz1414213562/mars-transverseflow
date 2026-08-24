@@ -48,8 +48,10 @@
 	<contributors>
 		<contributor>
 			<name>Thomas Retzer</name>
-            <name>Fritz Nagae</name>
 		</contributor>
+        <contributor>
+            <name>Fritz Nagae</name>
+        </contributor>
 	</contributors>
 
 	<mailingLists>
