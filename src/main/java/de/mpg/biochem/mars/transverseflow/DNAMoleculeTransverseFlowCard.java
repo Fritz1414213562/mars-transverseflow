@@ -61,9 +61,13 @@ import de.mpg.biochem.mars.molecule.Molecule;
 import de.mpg.biochem.mars.molecule.MoleculeArchive;
 import de.mpg.biochem.mars.molecule.MoleculeArchiveIndex;
 import de.mpg.biochem.mars.molecule.MoleculeArchiveProperties;
+import de.mpg.biochem.mars.transverseflow.commands.MarsTransverseDNAPeakTrackerBdvCommand;
 
 import java.util.*;
 import java.awt.event.ItemEvent;
+import java.awt.event.ActionListener;
+import java.awt.Window;
+import java.util.concurrent.*;
 
 @Plugin(type = MarsBdvCard.class, name = "DNA-Overlay")
 public class DNAMoleculeTransverseFlowCard extends AbstractJsonConvertibleRecord implements
@@ -168,38 +172,44 @@ public class DNAMoleculeTransverseFlowCard extends AbstractJsonConvertibleRecord
         dnaBpLength.setMinimumSize(dimScaleField);
         panel.add(dnaBpLength);
 
-        //JButton peakTrackerButton = new JButton("Add Track");
-        //peakTrackerButton.addActionListener(new ActionListener() {
+        panel.add(new JLabel("Molecule Tracking Tool"));
+        panel.add(new JPanel());
 
-        //    public void actionPerformed(ActionEvent e) {
-        //        ExecutorService backgroundThread = Executors.newSingleThreadExecutor();
-        //        backgroundThread.submit(() -> {
-        //            MarsDNAPeakTrackerBdvCommand peakTrackerCommand = new MarsDNAPeakTrackerBdvCommand();
-        //            peakTrackerCommand.setContext(context);
+        JButton peakTrackerButton = new JButton("Add Track");
+        peakTrackerButton.addActionListener(new ActionListener() {
 
-        //            for (Window window : Window.getWindows())
-        //                if (window instanceof JDialog && ((JDialog) window).getTitle()
-        //                        .equals(peakTrackerCommand.getInfo().getLabel()) && ((JDialog) window).isVisible()) {
-        //                    ((JDialog) window).toFront();
-        //                    ((JDialog) window).repaint();
-        //                    return;
-        //                }
+            public void actionPerformed(ActionEvent e) {
+                ExecutorService backgroundThread = Executors.newSingleThreadExecutor();
+                backgroundThread.submit(() -> {
+                    MarsTransverseDNAPeakTrackerBdvCommand peakTrackerCommand = new MarsTransverseDNAPeakTrackerBdvCommand();
+                    peakTrackerCommand.setContext(context);
 
-        //            //We set these directly to avoid pre and post processors from running
-        //            //we don't need that in this context
-        //            peakTrackerCommand.setMarsBdvFrame(marsBdvFrame);
-        //            peakTrackerCommand.setArchive(archive);
-        //            try {
-        //                moduleService.run(peakTrackerCommand, true).get();
-        //            }
-        //            catch (InterruptedException | ExecutionException exc) {
-        //                exc.printStackTrace();
-        //            }
-        //        });
-        //        backgroundThread.shutdown();
-        //    }
-        //});
-        //panel.add(peakTrackerButton);
+                    for (Window window : Window.getWindows())
+                        if (window instanceof JDialog && ((JDialog) window).getTitle()
+                                .equals(peakTrackerCommand.getInfo().getLabel()) && ((JDialog) window).isVisible()) {
+                            ((JDialog) window).toFront();
+                            ((JDialog) window).repaint();
+                            return;
+                        }
+
+                    //We set these directly to avoid pre and post processors from running
+                    //we don't need that in this context
+                    peakTrackerCommand.setMarsBdvFrame(marsBdvFrame);
+                    peakTrackerCommand.setArchive(archive);
+                    try {
+                        moduleService.run(peakTrackerCommand, true).get();
+                    }
+                    catch (InterruptedException | ExecutionException exc) {
+                        exc.printStackTrace();
+                    }
+                });
+                backgroundThread.shutdown();
+            }
+        });
+        panel.add(peakTrackerButton);
+
+        //panel.add(new JLabel(""));
+        //panel.add(new JPanel());
 
         panel.add(new JLabel("Drawing tools"));
         panel.add(new JPanel());
