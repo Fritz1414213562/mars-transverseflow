@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.swing.JDialog;
 
-import de.mpg.biochem.mars.transverseflow.BezierLength;
+import de.mpg.biochem.mars.transverseflow.ArchDNASegment;
 import de.mpg.biochem.mars.transverseflow.BezierNearestBernstein;
 import net.imagej.ops.OpService;
 import net.imglib2.Interval;
@@ -368,17 +368,16 @@ public class MarsTransverseDNAPeakTrackerBdvCommand extends InteractiveCommand i
             Molecule dnaMolecule = marsBdvFrame.getSelectedMolecule();
             MarsTable dnaMoleculeTable = (replaceAllTracks) ? new MarsTable() : dnaMolecule.getTable();
 
-            DNASegment archDnaSegment = new DNASegment(dnaMolecule.getParameter("Dna_Top_X1"), dnaMolecule.getParameter("Dna_Top_Y1"),
-                    dnaMolecule.getParameter("Dna_Bottom_X2"), dnaMolecule.getParameter("Dna_Bottom_Y2"));
-            List<Point2D.Double> handles = new ArrayList<>(){{
-                add(new Point2D.Double(dnaMolecule.getParameter("Arch_Handle_Top_X1"), dnaMolecule.getParameter("Arch_Handle_Top_Y1")));
-                add(new Point2D.Double(dnaMolecule.getParameter("Arch_Handle_Bottom_X1"), dnaMolecule.getParameter("Arch_Handle_Bottom_Y1")));
-            }};
+            ArchDNASegment archDnaSegment = new ArchDNASegment(
+                    dnaMolecule.getParameter("Dna_Top_X1"), dnaMolecule.getParameter("Dna_Top_Y1"),
+                    dnaMolecule.getParameter("Arch_Handle_Top_X1"), dnaMolecule.getParameter("Arch_Handle_Top_Y1"),
+                    dnaMolecule.getParameter("Dna_Bottom_X2"), dnaMolecule.getParameter("Dna_Bottom_Y2"),
+                    dnaMolecule.getParameter("Arch_Handle_Bottom_X1"), dnaMolecule.getParameter("Arch_Handle_Bottom_Y1"));
 
             List<SingleMolecule> moleculesOnDNA = findMoleculesOnDna(
-                    archive1PositionSearcher, tracksArchive, archDnaSegment, handles);
+                    archive1PositionSearcher, tracksArchive, archDnaSegment);
 
-            if (moleculesOnDNA.size() != 0) addTracksToDnaMoleculeTable(dnaMoleculeTable, moleculesOnDNA, source, archDnaSegment, handles);
+            if (moleculesOnDNA.size() != 0) addTracksToDnaMoleculeTable(dnaMoleculeTable, moleculesOnDNA, source, archDnaSegment);
 
             dnaMolecule.setParameter("Number_" + source, moleculesOnDNA.size());
             dnaMolecule.setTable(dnaMoleculeTable);
@@ -426,7 +425,7 @@ public class MarsTransverseDNAPeakTrackerBdvCommand extends InteractiveCommand i
     }
 
     private void addTracksToDnaMoleculeTable(MarsTable mergedTable, List<SingleMolecule> moleculesOnDNA,
-                                             String name, DNASegment dnaSegment, List<Point2D.Double> handles)
+                                             String name, ArchDNASegment archDNASegment)
     {
         //If we are not removing all tracks, we just need to remove all tracks for the current channel
         if (mergedTable.getColumnCount() > 0) {
@@ -473,8 +472,10 @@ public class MarsTransverseDNAPeakTrackerBdvCommand extends InteractiveCommand i
             }
         }
 
-        Point2D.Double p0 = new Point2D.Double(dnaSegment.getX1(), dnaSegment.getY1());
-        Point2D.Double p1 = new Point2D.Double(dnaSegment.getX2(), dnaSegment.getY2());
+        Point2D.Double p0 = new Point2D.Double(archDNASegment.getX1(), archDNASegment.getY1());
+        Point2D.Double p1 = new Point2D.Double(archDNASegment.getX2(), archDNASegment.getY2());
+        Point2D.Double h0 = new Point2D.Double(archDNASegment.getHX1(), archDNASegment.getHY1());
+        Point2D.Double h1 = new Point2D.Double(archDNASegment.getHX2(), archDNASegment.getHY2());
 
         int index = 1;
         for (SingleMolecule molecule : moleculesOnDNA) {
@@ -497,7 +498,7 @@ public class MarsTransverseDNAPeakTrackerBdvCommand extends InteractiveCommand i
             for (int row = 0; row < rows; row++) {
                 if (row < table.getRowCount()) {
                     Point2D.Double pos = new Point2D.Double(table.getValue(Peak.X, row), table.getValue(Peak.Y, row));
-                    BezierNearestBernstein.BNBResult bnbResult = BezierNearestBernstein.findNearestPoint(pos, p0, p1, handles.get(0), handles.get(1));
+                    BezierNearestBernstein.BNBResult bnbResult = BezierNearestBernstein.findNearestPoint(pos, p0, p1, h0, h1);
                     double positionOnDNA = bnbResult.t * DNALength;
                     dnaPositionColumn.add(positionOnDNA);
                 }
@@ -545,24 +546,31 @@ public class MarsTransverseDNAPeakTrackerBdvCommand extends InteractiveCommand i
 
     private ArrayList<SingleMolecule> findMoleculesOnDna(
             RadiusNeighborSearchOnKDTree<MoleculePosition> archivePositionSearcher,
-            SingleMoleculeArchive tracksArchive, DNASegment dnaSegment,
-            List<Point2D.Double> handles)
+            SingleMoleculeArchive tracksArchive, ArchDNASegment dnaSegment)
     {
         ArrayList<SingleMolecule> moleculesLocated =
                 new ArrayList<SingleMolecule>();
 
-        archivePositionSearcher.search(dnaSegment, radius + dnaSegment.getLength() / 2,
-                false);
-
         Point2D.Double p0 = new Point2D.Double(dnaSegment.getX1(), dnaSegment.getY1());
         Point2D.Double p1 = new Point2D.Double(dnaSegment.getX2(), dnaSegment.getY2());
+        Point2D.Double h0 = new Point2D.Double(dnaSegment.getHX1(), dnaSegment.getHY1());
+        Point2D.Double h1 = new Point2D.Double(dnaSegment.getHX2(), dnaSegment.getHY2());
+        Point2D.Double middle = new Point2D.Double(dnaSegment.getXMiddle(), dnaSegment.getYMiddle());
+        Point2D.Double center = new Point2D.Double(dnaSegment.getXCenter(), dnaSegment.getYCenter());
+
+        double searchRadius = Math.max(
+                Math.max(center.distance(p0), center.distance(p1)),
+                center.distance(middle)
+        ) + radius;
+
+        archivePositionSearcher.search(dnaSegment, searchRadius, false);
 
         for (int j = 0; j < archivePositionSearcher.numNeighbors(); j++) {
             MoleculePosition moleculePosition = archivePositionSearcher.getSampler(j)
                     .get();
 
             Point2D.Double pos = new Point2D.Double(moleculePosition.getX(), moleculePosition.getY());
-            BezierNearestBernstein.BNBResult bnbResult = BezierNearestBernstein.findNearestPoint(pos, p0, p1, handles.get(0), handles.get(1));
+            BezierNearestBernstein.BNBResult bnbResult = BezierNearestBernstein.findNearestPoint(pos, p0, p1, h0, h1);
 
             if (bnbResult.distance < radius) {
                 moleculesLocated.add(tracksArchive.get(moleculePosition.getUID()));

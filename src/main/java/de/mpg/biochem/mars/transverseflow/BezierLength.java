@@ -94,6 +94,30 @@ public class BezierLength {
         return half * sum;
     }
 
+    public static Point2D.Double evaluate(
+            Point2D.Double p0,
+            Point2D.Double h0,
+            Point2D.Double h1,
+            Point2D.Double p3,
+            double t) {
+
+        double u = 1.0 - t;
+
+        double x =
+                u * u * u * p0.x
+                        + 3 * u * u * t * h0.x
+                        + 3 * u * t * t * h1.x
+                        + t * t * t * p3.x;
+
+        double y =
+                u * u * u * p0.y
+                        + 3 * u * u * t * h0.y
+                        + 3 * u * t * t * h1.y
+                        + t * t * t * p3.y;
+
+        return new Point2D.Double(x, y);
+    }
+
 
     /**
      * |B'(t)|
