@@ -38,6 +38,7 @@ import javax.swing.*;
 import de.mpg.biochem.mars.fx.bdv.MarsBdvCard;
 import de.mpg.biochem.mars.fx.bdv.MarsBdvFrame;
 import de.mpg.biochem.mars.fx.dialogs.RoverConfirmationDialog;
+import de.mpg.biochem.mars.fx.dialogs.RoverErrorDialog;
 import de.mpg.biochem.mars.fx.molecule.AbstractMoleculeArchiveFxFrame;
 import de.mpg.biochem.mars.image.DNASegment;
 import de.mpg.biochem.mars.table.MarsTable;
@@ -173,7 +174,7 @@ public class DNAMoleculeTransverseFlowCard extends AbstractJsonConvertibleRecord
         panel.add(dnaBpLength);
 
         panel.add(new JLabel("Molecule Tracking Tool"));
-        panel.add(new JPanel());
+        panel.add(new JLabel(""));
 
         JButton peakTrackerButton = new JButton("Add Track");
         peakTrackerButton.addActionListener(new ActionListener() {
@@ -208,11 +209,9 @@ public class DNAMoleculeTransverseFlowCard extends AbstractJsonConvertibleRecord
         });
         panel.add(peakTrackerButton);
 
-        //panel.add(new JLabel(""));
-        //panel.add(new JPanel());
+        panel.add(new JLabel(""));
 
         panel.add(new JLabel("Drawing tools"));
-        panel.add(new JPanel());
 
         JToggleButton archDrawButton = new JToggleButton("Draw Arch");
         archDrawButton.addItemListener((ItemEvent ev) -> {
@@ -255,10 +254,15 @@ public class DNAMoleculeTransverseFlowCard extends AbstractJsonConvertibleRecord
                                 new RoverConfirmationDialog(((AbstractMoleculeArchiveFxFrame<?, ?>) archive.getWindow()).getNode().getScene().getWindow(),
                                         "Append selected branches to MarsTable?", "Yes", "No");
                         addDNAMoleculesToArchive.showAndWait().ifPresent(result -> {
-                            if (result.getButtonData().isDefaultButton())
-                                ((AbstractMoleculeArchiveFxFrame<?, ?>) archive.getWindow())
-                                        .runTask(() -> appendBranchDNARecord(segments),
-                                                "Appending branched DNA to corresponding arched DNA molecules...");
+                            if (result.getButtonData().isDefaultButton()) {
+                                try {
+                                    appendBranchDNARecord(segments);
+                                } catch (Exception e) {
+                                    RoverErrorDialog alert = new RoverErrorDialog(((AbstractMoleculeArchiveFxFrame<?, ?>) archive.getWindow()).getNode().getScene().getWindow(),
+                                            e.getMessage());
+                                    alert.show();
+                                }
+                            }
                         });
                     });
                 }
@@ -344,53 +348,57 @@ public class DNAMoleculeTransverseFlowCard extends AbstractJsonConvertibleRecord
     protected void createDNAmoleculeRecords(List<Point2D.Double> points, List<Point2D.Double> handles) {
         if (archive != null) {
             archive.getWindow().lock();
-            List<String> uids = new ArrayList<>();
             MarsTable table = new MarsTable("table");
-            Molecule molecule = archive.createMolecule(MarsMath.getUUID58(), table);
-            molecule.setMetadataUID(marsBdvFrame.getMetadataUID());
-            molecule.setImage(archive.getMetadata(marsBdvFrame.getMetadataUID()).getImage(0).getImageID());
+            Molecule dnaMolecule = archive.createMolecule(MarsMath.getUUID58(), table);
+            dnaMolecule.setMetadataUID(marsBdvFrame.getMetadataUID());
+            dnaMolecule.setImage(archive.getMetadata(marsBdvFrame.getMetadataUID()).getImage(0).getImageID());
             double archLength = BezierLength.length(points.get(0), handles.get(0), handles.get(1), points.get(1));
-            molecule.setParameter("Dna_Top_X1", points.get(0).x);
-            molecule.setParameter("Dna_Top_Y1", points.get(0).y);
-            molecule.setParameter("Dna_Bottom_X2", points.get(1).x);
-            molecule.setParameter("Dna_Bottom_Y2", points.get(1).y);
-            molecule.setParameter("Arch_Handle_Top_X1", handles.get(0).x);
-            molecule.setParameter("Arch_Handle_Top_Y1", handles.get(0).y);
-            molecule.setParameter("Arch_Handle_Bottom_X1", handles.get(1).x);
-            molecule.setParameter("Arch_Handle_Bottom_Y1", handles.get(1).y);
-            molecule.setParameter("Arch_Length", archLength);
-            molecule.setParameter("Arch_BpLength", dnaLength);
-            molecule.addTag("Bdv Draw DNA");
-            molecule.setNotes("DnaMolecule created on " + new java.util.Date() + " by the Bdv Draw DNA");
+            dnaMolecule.setParameter("Dna_Top_X1", points.get(0).x);
+            dnaMolecule.setParameter("Dna_Top_Y1", points.get(0).y);
+            dnaMolecule.setParameter("Dna_Bottom_X2", points.get(1).x);
+            dnaMolecule.setParameter("Dna_Bottom_Y2", points.get(1).y);
+            dnaMolecule.setParameter("Arch_Handle_Top_X1", handles.get(0).x);
+            dnaMolecule.setParameter("Arch_Handle_Top_Y1", handles.get(0).y);
+            dnaMolecule.setParameter("Arch_Handle_Bottom_X1", handles.get(1).x);
+            dnaMolecule.setParameter("Arch_Handle_Bottom_Y1", handles.get(1).y);
+            dnaMolecule.setParameter("Arch_Length", archLength);
+            dnaMolecule.setParameter("Arch_BpLength", dnaLength);
+            dnaMolecule.addTag("Bdv Draw DNA");
+            dnaMolecule.setNotes("DnaMolecule created on " + new java.util.Date() + " by the Bdv Draw DNA");
             //add to archive
-            archive.put(molecule);
-            //should add something to the archive log ... logService.info("Added DnaMolecule record " + molecule.getUID());
-            uids.add(molecule.getUID());
+            archive.put(dnaMolecule);
+            //should add something to the archive log ... logService.info("Added DnaMolecule record " + dnaMolecule.getUID());
+            String uid = dnaMolecule.getUID();
 
             LogBuilder builder = new LogBuilder();
             String log = LogBuilder.buildTitleBlock("Bdv Drawn DNA");
 
-            String uidList = uids.get(0);
-            for (int i = 1; i < uids.size(); i++)
-                uidList = uidList + ", " + uids.get(i);
-
-            builder.addParameter("Created DnaMolecules", uidList);
+            builder.addParameter("Created DnaMolecules", uid);
             builder.addParameter("Metadata UID", marsBdvFrame.getMetadataUID());
             log += builder.buildParameterList();
             log += "\n" + LogBuilder.endBlock();
             archive.getMetadata(marsBdvFrame.getMetadataUID()).logln(log);
 
             archive.getWindow().unlock();
-            final String lastUID = uids.get(uids.size() - 1);
-            Platform.runLater(() -> ((AbstractMoleculeArchiveFxFrame) archive.getWindow()).getMoleculesTab().setSelectedMolecule(lastUID));
-            marsBdvFrame.setMolecule(archive.get(lastUID));
+            Platform.runLater(() -> ((AbstractMoleculeArchiveFxFrame) archive.getWindow()).getMoleculesTab().setSelectedMolecule(uid));
+            marsBdvFrame.setMolecule(archive.get(uid));
         }
     }
 
     protected void appendBranchDNARecord(Map<Integer, DNASegment> segments) {
 
         Molecule dnaMolecule = marsBdvFrame.getSelectedMolecule();
+        // If no DNA molecule is selected (e.g. when you open an empty archive), it will open an error dialog.
+        if (dnaMolecule == null) throw new NullPointerException("Error: No DNA molecule was selected. Please draw and select an arch DNA before drawing branches.");
         MarsTable dnaMoleculeTable = dnaMolecule.getTable();
+        // If no branches are drawn, just ignore it.
+        if (segments.isEmpty()) return;
+        MarsTable branchMoleculeTable = findBranchDNAOnTheArch(dnaMolecule, segments);
+        // If no branches are located around the selected arch DNA, just ignore it.
+        if (branchMoleculeTable.getRowCount() < 1) {
+            logService.info("No branch was found in the vicinity of the selected arch DNA molecule.");
+            return;
+        }
 
         if (dnaMoleculeTable.getColumnCount() > 0) {
             List<String> oldTrackColumnNames = new ArrayList<>();
@@ -398,23 +406,23 @@ public class DNAMoleculeTransverseFlowCard extends AbstractJsonConvertibleRecord
             for (String header : oldTrackColumnNames)
                 dnaMoleculeTable.removeColumn(header);
         }
-        if (!segments.isEmpty()) {
-            MarsTable branchMoleculeTable = findBranchDNAOnTheArch(dnaMolecule, segments);
-            int nrow = Math.max(dnaMoleculeTable.getRowCount(), branchMoleculeTable.getRowCount());
-            if (nrow < 1) return;
-            else if (nrow > dnaMoleculeTable.getRowCount()) {
-                for (int irow = dnaMoleculeTable.getRowCount(); irow < nrow; ++irow) {
-                    dnaMoleculeTable.appendRow();
-                    for (int icol = 0; icol < dnaMoleculeTable.getColumnCount(); ++icol) {
-                        dnaMoleculeTable.set(icol, irow, Double.NaN);
-                    }
+
+        int nrow = Math.max(dnaMoleculeTable.getRowCount(), branchMoleculeTable.getRowCount());
+        if (nrow < 1) return;
+        else if (nrow > dnaMoleculeTable.getRowCount()) {
+            for (int irow = dnaMoleculeTable.getRowCount(); irow < nrow; ++irow) {
+                dnaMoleculeTable.appendRow();
+                for (int icol = 0; icol < dnaMoleculeTable.getColumnCount(); ++icol) {
+                    dnaMoleculeTable.set(icol, irow, Double.NaN);
                 }
             }
-            for (int icol = 0; icol < branchMoleculeTable.getColumnCount(); ++icol) {
-                dnaMoleculeTable.add(branchMoleculeTable.get(icol));
-            }
-            molecule.addTag("Bdv Draw Branch");
         }
+        for (int icol = 0; icol < branchMoleculeTable.getColumnCount(); ++icol) {
+            dnaMoleculeTable.add(branchMoleculeTable.get(icol));
+        }
+        //molecule.addTag("Bdv Draw Branch");
+        dnaMolecule.addTag("Bdv Draw Branch");
+        archive.getWindow().unlock();
     }
 
     private MarsTable findBranchDNAOnTheArch(Molecule dnaMolecule, Map<Integer, DNASegment> segments) {
@@ -502,7 +510,7 @@ public class DNAMoleculeTransverseFlowCard extends AbstractJsonConvertibleRecord
         if (dnaMoleculeOverlay == null) {
             dnaMoleculeOverlay = new ArchBranchIntegratedOverlay();
             dnaMoleculeOverlay.setThickness(Integer.valueOf(dnaThickness.getText()));
-            if (molecule != null) {
+            if (this.molecule != null) {
                 List<Point2D.Double> points  = new ArrayList<>();
                 List<Point2D.Double> handles = new ArrayList<>();
                 Map<Integer, DNASegment> segments = new HashMap<>();
