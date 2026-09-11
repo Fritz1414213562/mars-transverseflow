@@ -93,6 +93,13 @@ public class TransverseFlowArchiveFxFrame extends
 		laggingCard.initialize();
 		cards.add(laggingCard);
 
+        // Branch + Arch Drawer
+        DNAMoleculeTransverseFlowCard dnaMoleculeTransverseFlowCard = new DNAMoleculeTransverseFlowCard();
+        context.inject(dnaMoleculeTransverseFlowCard);
+        dnaMoleculeTransverseFlowCard.setArchive(archive);
+        dnaMoleculeTransverseFlowCard.initialize();
+        cards.add(dnaMoleculeTransverseFlowCard);
+
 		return new MarsBdvFrame(archive, moleculesTab.getSelectedMolecule(),
 			imageMetadataTab.getSelectedMetadata(), useVolatile, cards, context);
 	}

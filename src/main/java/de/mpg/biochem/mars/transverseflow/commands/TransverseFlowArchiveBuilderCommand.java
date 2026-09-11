@@ -32,6 +32,7 @@ package de.mpg.biochem.mars.transverseflow.commands;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import de.mpg.biochem.mars.fx.bdv.MarsBdvFrame;
 import de.mpg.biochem.mars.metadata.MarsOMEMetadata;
 import de.mpg.biochem.mars.metadata.MarsOMEUtils;
 import de.mpg.biochem.mars.molecule.MoleculeArchiveService;
@@ -165,6 +166,9 @@ public class TransverseFlowArchiveBuilderCommand extends DynamicCommand implemen
 	@Parameter(label = "DNA length (bps)")
 	private double lengthBps = 27000;
 
+    @Parameter(label = "Channel ID")
+    private int channelID = 0;
+
 	@Parameter(label = "Metadata UID",
 		style = ChoiceWidget.RADIO_BUTTON_VERTICAL_STYLE,
 		choices = { "unique from dataset", "random" })
@@ -274,8 +278,8 @@ public class TransverseFlowArchiveBuilderCommand extends DynamicCommand implemen
 
 		TransverseFlowMolecule molecule = new TransverseFlowMolecule();
 		for (int t = 0; t < sizeT; t++) {
-			ReplicationForkShape repliShape = new ReplicationForkShape((parentalXMap.containsKey(t)) ? parentalXMap.get(t) : new double[0],
-					(parentalYMap.containsKey(t)) ? parentalYMap.get(t) : new double[0],
+            if (!parentalXMap.containsKey(t) || !parentalYMap.containsKey(t)) continue;
+			ReplicationForkShape repliShape = new ReplicationForkShape(parentalXMap.get(t), parentalYMap.get(t),
 					(leadingXMap.containsKey(t)) ? leadingXMap.get(t) : new double[0],
 					(leadingYMap.containsKey(t)) ? leadingYMap.get(t) : new double[0],
 					(laggingXMap.containsKey(t)) ? laggingXMap.get(t) : new double[0],
@@ -300,8 +304,9 @@ public class TransverseFlowArchiveBuilderCommand extends DynamicCommand implemen
 			table.setValue("Arch_length_(um)", t, archLength*pixelSize);
 			table.setValue("Force_(pN)", t, calculator.getWLCForce(archLength * pixelSize * Math.pow(10, -6)) * Math.pow(10, 12));
 		}
-		if (molecule.hasShape(0)) {
-			double[] parentCenter = molecule.getShape(0).parentCenter();
+        int initialFrame = Collections.min(molecule.getShapeKeys());
+		if (molecule.hasShape(initialFrame)) {
+			double[] parentCenter = molecule.getShape(initialFrame).parentCenter();
 			molecule.setParameter("Parent_Center_X", parentCenter[0]);
 			molecule.setParameter("Parent_Center_Y", parentCenter[1]);
 		}
@@ -567,6 +572,7 @@ public class TransverseFlowArchiveBuilderCommand extends DynamicCommand implemen
 		builder.addParameter("Microscope", microscope);
 		builder.addParameter("Pixel size (um)", pixelSize);
 		builder.addParameter("DNA length (bps)", lengthBps);
+        builder.addParameter("Channel ID", channelID);
 		builder.addParameter("Metadata UID source", metadataUIDSource);
 	}
 
